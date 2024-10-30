@@ -1,4 +1,4 @@
-package main
+package internal
 
 import (
 	"bufio"
@@ -8,7 +8,11 @@ import (
 	"strings"
 )
 
-func handleRTSP(conn net.Conn) {
+const (
+	rtpPort = 5004
+)
+
+func HandleRTSP(conn net.Conn) {
 	defer func() {
 		if err := conn.Close(); err != nil {
 			fmt.Println("Error closing connection:", err)

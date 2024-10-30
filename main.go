@@ -3,10 +3,7 @@ package main
 import (
 	"fmt"
 	"net"
-)
-
-const (
-	rtpPort = 5004
+	"rtsp-server/internal"
 )
 
 func main() {
@@ -29,6 +26,6 @@ func main() {
 			fmt.Println("Error accepting connection:", err)
 			continue
 		}
-		go handleRTSP(conn)
+		go internal.HandleRTSP(conn)
 	}
 }
