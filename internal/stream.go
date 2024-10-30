@@ -134,6 +134,27 @@ func videoStreamUDP(clientAddr string, clientPort int) {
 
 	ticker := time.NewTicker(33 * time.Millisecond) // 30 fps
 	defer ticker.Stop()
+	// Channel to hold frames
+	frameChan := make(chan []byte)
+
+	// Goroutine to read frames from video file
+	go func() {
+		for {
+			frame, err := extractH264(file)
+			if err == io.EOF {
+				fmt.Println("End of video file reached")
+				close(frameChan) // Signal completion
+				return
+			}
+			if err != nil {
+				fmt.Println("Error extracting frame:", err)
+				close(frameChan)
+				return
+			}
+			frameChan <- frame // Send frame to channel
+		}
+	}()
+
 	// Basic RTP header
 	rtpHeader := make([]byte, 12)
 	rtpHeader[0] = 0x80         // RTP version 2
@@ -143,33 +164,32 @@ func videoStreamUDP(clientAddr string, clientPort int) {
 
 	// Read video file and send over RTP
 	for range ticker.C {
-		frame, err := extractH264(file)
-		if err == io.EOF {
-			fmt.Println("End of video file reached")
-			break
-		}
-		if err != nil {
-			fmt.Println("Error extracting frame:", err)
-			break
-		}
-		// Set RTP sequence number and timestamp
-		rtpHeader[2] = byte(sequenceNumber >> 8)
-		rtpHeader[3] = byte(sequenceNumber & 0xFF)
-		rtpHeader[4] = byte(timestamp >> 24)
-		rtpHeader[5] = byte((timestamp >> 16) & 0xFF)
-		rtpHeader[6] = byte((timestamp >> 8) & 0xFF)
-		rtpHeader[7] = byte(timestamp & 0xFF)
-		// Send the RTP packet (header + frame data)
-		rtpPacket := append(rtpHeader, frame...)
-		_, err = conn.Write(rtpPacket)
-		if err != nil {
-			fmt.Println("Error sending RTP packet:", err)
-			break
-		}
+		select {
+		case frame, ok := <-frameChan:
+			if !ok {
+				return
+			}
 
-		// Update sequence and timestamp for next frame
-		sequenceNumber++
-		timestamp += 3000 // Adjust timestamp increment based on frame rate
+			// Set RTP sequence number and timestamp
+			rtpHeader[2] = byte(sequenceNumber >> 8)
+			rtpHeader[3] = byte(sequenceNumber & 0xFF)
+			rtpHeader[4] = byte(timestamp >> 24)
+			rtpHeader[5] = byte((timestamp >> 16) & 0xFF)
+			rtpHeader[6] = byte((timestamp >> 8) & 0xFF)
+			rtpHeader[7] = byte(timestamp & 0xFF)
+			// Send the RTP packet (header + frame data)
+			rtpPacket := append(rtpHeader, frame...)
+			_, err = conn.Write(rtpPacket)
+			if err != nil {
+				fmt.Println("Error sending RTP packet:", err)
+				break
+			}
 
+			// Update sequence and timestamp for next frame
+			sequenceNumber++
+			timestamp += 3000 // Adjust timestamp increment based on frame rate
+		default:
+			continue
+		}
 	}
 }
