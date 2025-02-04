@@ -2,6 +2,7 @@ package internal
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"strconv"
 	"strings"
@@ -60,4 +61,9 @@ func parseTransportLine(reqStr string) (string, int, int, error) {
 		return "UDP", clientPortStart, clientPortEnd, nil
 	}
 	return "", 0, 0, fmt.Errorf("unsupported transport")
+}
+
+func fetchServerIP(conn net.Conn) string {
+	localAddr := conn.LocalAddr().String()
+	return localAddr
 }

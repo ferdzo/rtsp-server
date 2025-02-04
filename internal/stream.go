@@ -187,7 +187,7 @@ func videoStreamUDP(clientAddr string, clientPort int) {
 
 			// Update sequence and timestamp for next frame
 			sequenceNumber++
-			timestamp += 3000 // Adjust timestamp increment based on frame rate
+			timestamp += 3000 // timestamp increment for 30fps
 		default:
 			continue
 		}

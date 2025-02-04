@@ -23,6 +23,9 @@ func HandleRTSP(conn net.Conn) {
 	var transportType string               // To store transport type (TCP or UDP)
 	var clientIP string                    // To store client IP address
 	var clientPortStart, clientPortEnd int // Client ports for RTP
+	var serverIP string                    // Server IP address
+
+	serverIP = fetchServerIP(conn)
 
 	reader := bufio.NewReader(conn)
 	for {
@@ -53,32 +56,29 @@ func HandleRTSP(conn net.Conn) {
 			cseq = extractCSeq(reqStr)
 		}
 
-		if strings.Contains(reqStr, "OPTIONS") {
+		// Check the request type
+		switch {
+
+		case strings.Contains(reqStr, "OPTIONS"):
 			cseq++
 			handleOptions(conn, cseq)
 			continue
-		}
-
-		if strings.Contains(reqStr, "DESCRIBE") {
+		case strings.Contains(reqStr, "DESCRIBE"):
 			cseq++
-			handleDescribe(conn, cseq, clientIP)
+			handleDescribe(conn, cseq, clientIP, serverIP)
 			continue
-		}
-
-		if strings.Contains(reqStr, "SETUP") {
+		case strings.Contains(reqStr, "SETUP"):
 			cseq++
 			err := handleSetup(conn, reqStr, clientIP, cseq)
 			if err != nil {
 				return
 			}
 			continue
-		}
-
-		if strings.Contains(reqStr, "PLAY") {
+		case strings.Contains(reqStr, "PLAY"):
 			cseq++
 			handlePlay(conn, cseq, clientIP, clientPortStart, clientPortEnd, transportType)
-		}
-		if strings.Contains(reqStr, "TEARDOWN") {
+
+		case strings.Contains(reqStr, "TEARDOWN"):
 			cseq++
 			handleTeardown(conn, reqStr, cseq)
 			continue
@@ -92,7 +92,7 @@ func handleOptions(conn net.Conn, cseq int) {
 
 }
 
-func handleDescribe(conn net.Conn, cseq int, clientIP string) {
+func handleDescribe(conn net.Conn, cseq int, clientIP string, serverIP string) {
 	describeResponse := fmt.Sprintf(`RTSP/1.0 200 OK
 			CSeq: %d
 			Content-Base: rtsp://%s:554/
@@ -100,14 +100,14 @@ func handleDescribe(conn net.Conn, cseq int, clientIP string) {
 			Content-Length: 135
 			
 			v=0
-			o=- 0 0 IN IP4 127.0.0.1
+			o=- 0 0 IN IP4 %s
 			s=JPEG Stream
-			c=IN IP4 127.0.0.1
+			c=IN IP4 %s
 			t=0 0
 			a=tool:golang-rtsp-server
 			m=video %d RTP/AVP 26
 			a=rtpmap:26 H264/90000
-			`, cseq, clientIP, rtpPort)
+			`, cseq, clientIP, serverIP, serverIP, rtpPort)
 	writeResponse(conn, describeResponse)
 
 }
